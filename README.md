@@ -1,32 +1,21 @@
-# FlowBoost AI
+# FlowBoost - Task Management for Focus and Productivity
 
-FlowBoost AI is an advanced, AI-powered personal coach meticulously designed to assist individuals in overcoming persistent challenges such as procrastination, enhancing mental focus, improving self-worth, and ultimately achieving a sustainable state of peak productivity and holistic well-being.
+FlowBoost helps users break down tasks into manageable steps, maintain focus, and build productive habits.
 
 ## Features
 
-- **AI-Powered Task Management**: Intelligent task breakdown and prioritization
-- **Adaptive Focus System**: Smart Pomodoro timer that adapts to your flow state
-- **NLP-Driven Reflection Engine**: Analyze your thoughts and identify patterns
-- **AI Cognitive Restructuring Coach**: Overcome perfectionism and self-doubt
-- **Goal Setting & Habit Formation**: Track progress and build sustainable habits
-
-## Tech Stack
-
-- **Frontend**: Next.js, React, TypeScript, Tailwind CSS, Framer Motion
-- **Backend**: Next.js API Routes
-- **Database**: Vercel Postgres
-- **Authentication**: NextAuth.js
-- **AI**: OpenAI API
-- **Deployment**: Vercel
+- **Task Management**: Create, organize, and track tasks
+- **Task Templates**: Get suggestions for breaking down common task types
+- **Focus Timer**: Work in productive sessions with breaks
+- **Progress Tracking**: Visualize your accomplishments
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+ and npm
+- PostgreSQL database
 - Vercel account (for deployment)
-- OpenAI API key
-- Google OAuth credentials (optional)
 
 ### Installation
 
@@ -46,43 +35,52 @@ FlowBoost AI is an advanced, AI-powered personal coach meticulously designed to 
    cp .env.local.example .env.local
    ```
 
-4. Start the development server:
+4. Set up the database:
+   ```bash
+   psql your_database_url -f schema.sql
+   ```
+
+5. Start the development server:
    ```bash
    npm run dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
 ## Deployment
 
-### Deploying to Vercel
+1. Set up environment variables in Vercel:
+   ```bash
+   vercel env add NEXTAUTH_SECRET
+   vercel env add NEXTAUTH_URL
+   vercel env add POSTGRES_URL
+   ```
 
-1. Push your code to GitHub.
+2. Deploy to Vercel:
+   ```bash
+   ./deploy.sh
+   ```
 
-2. Connect your GitHub repository to Vercel.
+## Documentation
 
-3. Configure the environment variables in the Vercel dashboard.
+- [User Guide](docs/user-guide.md)
+- [Technical Documentation](docs/technical-documentation.md)
 
-4. Deploy!
+## Neurodivergent-Friendly Design
 
-## Database Schema
+FlowBoost is designed with neurodivergent users in mind:
 
-The application uses the following tables:
+- **Visual Clarity**: Clean interfaces with minimal distractions
+- **Cognitive Load Management**: Tasks broken into clear, manageable steps
+- **Flexible Interaction**: Multiple ways to accomplish tasks
+- **Emotional Support**: Positive reinforcement without overwhelming
 
-- `user_sessions`: Tracks user sessions
-- `user_events`: Logs user interactions and events
-- `user_preferences`: Stores user settings and preferences
-- `user_feedback`: Collects user feedback
+## Future Development
+
+In Phase 2, we plan to integrate AI capabilities to enhance the template system:
+
+1. Personalized task suggestions based on user history
+2. Natural language processing for task analysis
+3. Adaptive coaching based on user patterns
 
 ## License
 
 [MIT](LICENSE)
-
-## Acknowledgements
-
-- [Next.js](https://nextjs.org/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Framer Motion](https://www.framer.com/motion/)
-- [Lucide Icons](https://lucide.dev/)
-- [OpenAI](https://openai.com/)
-- [Vercel](https://vercel.com/)

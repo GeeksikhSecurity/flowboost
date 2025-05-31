@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { generateTaskSuggestions } from '@/lib/ai';
-import { useSession } from 'next-auth/react';
+import { suggestBreakdown } from '@/lib/templates/taskBreakdown';
 import type { MicroStep } from '@/types';
 
 interface AddTaskProps {
@@ -10,13 +9,14 @@ interface AddTaskProps {
 }
 
 export function AddTask({ onAddTask }: AddTaskProps) {
-  const { data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState('');
+  const [taskType, setTaskType] = useState('general');
   const [priority, setPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [microSteps, setMicroSteps] = useState<MicroStep[]>([]);
   const [newStep, setNewStep] = useState('');
-  const [isGeneratingSteps, setIsGeneratingSteps] = useState(false);
+  const [suggestedSteps, setSuggestedSteps] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +34,7 @@ export function AddTask({ onAddTask }: AddTaskProps) {
     setPriority('Medium');
     setMicroSteps([]);
     setIsOpen(false);
+    setShowSuggestions(false);
   };
   
   const addMicroStep = () => {
@@ -47,47 +48,21 @@ export function AddTask({ onAddTask }: AddTaskProps) {
     setNewStep('');
   };
   
+  const addSuggestedStep = (step: string) => {
+    setMicroSteps(prev => [
+      ...prev,
+      { id: crypto.randomUUID(), title: step, completed: false }
+    ]);
+  };
+  
   const removeMicroStep = (id: string) => {
     setMicroSteps(prev => prev.filter(step => step.id !== id));
   };
   
-  const generateSteps = async () => {
-    if (!title.trim() || !session?.user) return;
-    
-    setIsGeneratingSteps(true);
-    
-    try {
-      const response = await fetch('/api/ai/task-suggestions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskTitle: title })
-      });
-      
-      if (!response.ok) throw new Error('Failed to generate suggestions');
-      
-      const data = await response.json();
-      
-      if (data.suggestions) {
-        // Parse suggestions from AI response
-        const suggestions = data.suggestions
-          .split(/\\d+\\.\\s+/)
-          .filter(Boolean)
-          .map(step => step.trim())
-          .filter(step => step.length > 0);
-        
-        const newMicroSteps = suggestions.map(step => ({
-          id: crypto.randomUUID(),
-          title: step,
-          completed: false
-        }));
-        
-        setMicroSteps(prev => [...prev, ...newMicroSteps]);
-      }
-    } catch (error) {
-      console.error('Error generating steps:', error);
-    } finally {
-      setIsGeneratingSteps(false);
-    }
+  const handleGetSuggestions = () => {
+    const suggestions = suggestBreakdown(title, taskType);
+    setSuggestedSteps(suggestions);
+    setShowSuggestions(true);
   };
   
   return (
@@ -126,20 +101,41 @@ export function AddTask({ onAddTask }: AddTaskProps) {
               />
             </div>
             
-            <div>
-              <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-1">
-                Priority
-              </label>
-              <select
-                id="priority"
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as 'High' | 'Medium' | 'Low')}
-                className="input-field"
-              >
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label htmlFor="taskType" className="block text-sm font-medium text-gray-700 mb-1">
+                  Task Type
+                </label>
+                <select
+                  id="taskType"
+                  value={taskType}
+                  onChange={(e) => setTaskType(e.target.value)}
+                  className="input-field"
+                >
+                  <option value="general">General Task</option>
+                  <option value="writing">Writing Task</option>
+                  <option value="project">Project Planning</option>
+                  <option value="study">Study Session</option>
+                  <option value="email">Email Task</option>
+                  <option value="meeting">Meeting Prep</option>
+                </select>
+              </div>
+              
+              <div className="flex-1">
+                <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-1">
+                  Priority
+                </label>
+                <select
+                  id="priority"
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as 'High' | 'Medium' | 'Low')}
+                  className="input-field"
+                >
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
             </div>
             
             <div>
@@ -147,16 +143,15 @@ export function AddTask({ onAddTask }: AddTaskProps) {
                 <label htmlFor="microSteps" className="block text-sm font-medium text-gray-700">
                   Break it down (Micro-steps)
                 </label>
-                {session?.user && (
-                  <button
-                    type="button"
-                    onClick={generateSteps}
-                    disabled={!title.trim() || isGeneratingSteps}
-                    className="text-xs text-primary-600 hover:text-primary-800 disabled:text-gray-400"
-                  >
-                    {isGeneratingSteps ? 'Generating...' : 'Generate with AI'}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleGetSuggestions}
+                  disabled={!title.trim()}
+                  className="text-xs flex items-center gap-1 text-primary-600 hover:text-primary-800 disabled:text-gray-400"
+                >
+                  <Lightbulb size={14} />
+                  <span>Suggest Steps</span>
+                </button>
               </div>
               
               <div className="space-y-2 mb-2">
@@ -209,6 +204,30 @@ export function AddTask({ onAddTask }: AddTaskProps) {
                 </button>
               </div>
             </div>
+            
+            {showSuggestions && suggestedSteps.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-primary-50 p-3 rounded-md border border-primary-100"
+              >
+                <h4 className="text-sm font-medium text-primary-700 mb-2">Suggested Steps:</h4>
+                <div className="space-y-1">
+                  {suggestedSteps.map((step, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => addSuggestedStep(step)}
+                        className="text-xs bg-primary-100 hover:bg-primary-200 text-primary-700 px-2 py-1 rounded"
+                      >
+                        Add
+                      </button>
+                      <span className="text-sm">{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
             
             <div className="flex justify-end gap-2">
               <button
