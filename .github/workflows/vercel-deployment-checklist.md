@@ -25,6 +25,7 @@
 - [ ] **Run linting**: `npm run lint` or `yarn lint`
 - [ ] **Run type checking**: `npm run type-check` or `tsc --noEmit`
 - [ ] **Run tests**: `npm test` or `yarn test`
+- [ ] **Run E2E tests**: `npm run test:e2e` or `yarn test:e2e`
 - [ ] **Check build locally**: `npm run build` or `yarn build`
 - [ ] **Verify no console errors/warnings** in build output
 
@@ -57,6 +58,7 @@
 
 #### Deployment Execution
 - [ ] **Deploy to preview first**: `vercel --prod=false`
+- [ ] **Run E2E tests against preview**: `PLAYWRIGHT_TEST_BASE_URL=https://preview-url.vercel.app npm run test:e2e`
 - [ ] **Test preview deployment** thoroughly
 - [ ] **Deploy to production**: `vercel --prod`
 - [ ] **Monitor deployment logs**: `vercel logs --follow`
@@ -70,6 +72,7 @@
 - [ ] **Check database connections** are working
 - [ ] **Test authentication flows** if applicable
 - [ ] **Verify static assets** are loading correctly
+- [ ] **Run E2E tests against production**: `PLAYWRIGHT_TEST_BASE_URL=https://your-app.vercel.app npm run test:e2e`
 
 #### Performance & Monitoring
 - [ ] **Check Core Web Vitals** in Vercel Analytics
@@ -176,15 +179,47 @@ jobs:
           vercel-args: '--prod'
 ```
 
+### E2E Testing with Playwright
+```yaml
+# .github/workflows/playwright.yml
+name: Playwright Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      - name: Run Playwright tests
+        run: npx playwright test
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+```
+
 ### Package.json Scripts
 ```json
 {
   "scripts": {
-    "predeploy": "npm run lint && npm run test && npm run build",
+    "predeploy": "npm run lint && npm run test && npm run test:e2e && npm run build",
     "deploy": "vercel --prod",
     "deploy:preview": "vercel",
     "env:pull": "vercel env pull",
-    "logs": "vercel logs --follow"
+    "logs": "vercel logs --follow",
+    "test:e2e": "playwright test"
   }
 }
 ```
@@ -200,6 +235,7 @@ docker run --name postgres-dev -e POSTGRES_PASSWORD=dev -p 5432:5432 -d postgres
 # Install recommended VS Code extensions
 code --install-extension ms-vscode.vscode-typescript-next
 code --install-extension bradlc.vscode-tailwindcss
+code --install-extension ms-playwright.playwright
 ```
 
 ---
@@ -253,6 +289,12 @@ vercel logs                   # View function logs
 vercel rollback              # Rollback deployment
 vercel domains               # Manage custom domains
 vercel certs                 # Manage SSL certificates
+
+# Playwright E2E testing commands
+npx playwright install        # Install browsers
+npx playwright test           # Run all tests
+npx playwright test --ui      # Run tests with UI
+npx playwright test --debug   # Debug tests
 ```
 
 By following this checklist systematically, you'll minimize deployment issues and ensure consistent, reliable deployments to Vercel.
