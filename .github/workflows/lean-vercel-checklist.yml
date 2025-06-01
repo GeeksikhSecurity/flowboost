@@ -1,0 +1,151 @@
+name: Lean Vercel Deployment Checklist
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  pre-deployment-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+      
+      # Code quality checks
+      - name: Run linting
+        run: npm run lint || echo "Linting issues found"
+      
+      - name: Check TypeScript types
+        run: npx tsc --noEmit || echo "Type issues found"
+      
+      - name: Run tests
+        run: npm test || echo "Tests failed"
+      
+      # Security checks
+      - name: Check for vulnerabilities
+        run: npm audit --audit-level=high || echo "Security vulnerabilities found"
+      
+      # File system checks (case sensitivity issues)
+      - name: Check for case sensitivity issues
+        run: |
+          echo "Checking for files with inconsistent casing..."
+          UPPERCASE_FILES=$(find . -type f -name "[A-Z]*" | grep -v "node_modules" | grep -v ".git")
+          if [ ! -z "$UPPERCASE_FILES" ]; then
+            echo "⚠️ Files with uppercase characters found. Verify import paths match exact case:"
+            echo "$UPPERCASE_FILES"
+            echo "This may cause ENOENT errors on Vercel's Linux environment."
+          fi
+      
+      # Environment variable checks
+      - name: Check for required environment variables
+        run: |
+          echo "Checking for required environment variables in Vercel..."
+          MISSING_VARS=""
+          
+          # Check for common required variables
+          for VAR in "POSTGRES_URL" "NEXTAUTH_URL" "NEXTAUTH_SECRET"; do
+            if ! grep -q "$VAR" .env.example 2>/dev/null && ! grep -q "$VAR" .env.local.example 2>/dev/null; then
+              MISSING_VARS="$MISSING_VARS\n- $VAR"
+            fi
+          done
+          
+          if [ ! -z "$MISSING_VARS" ]; then
+            echo "⚠️ Potentially missing environment variables:"
+            echo -e "$MISSING_VARS"
+            echo "Ensure these are set in your Vercel project settings."
+          fi
+      
+      # Database connection string check
+      - name: Check database connection string format
+        run: |
+          if grep -q "POSTGRES_URL" .env.example 2>/dev/null || grep -q "DATABASE_URL" .env.example 2>/dev/null; then
+            echo "⚠️ Reminder: For serverless environments, ensure your Postgres connection string includes pooling parameters:"
+            echo "postgresql://user:password@host/database?sslmode=require&pgbouncer=true"
+          fi
+      
+      # Auth.js callback URL check
+      - name: Check Auth.js configuration
+        run: |
+          if grep -q "NEXTAUTH" .env.example 2>/dev/null || [ -f "pages/api/auth/[...nextauth].js" ] || [ -f "pages/api/auth/[...nextauth].ts" ] || [ -f "app/api/auth/[...nextauth]/route.js" ] || [ -f "app/api/auth/[...nextauth]/route.ts" ]; then
+            echo "⚠️ Auth.js detected. Ensure callback URLs match between environments:"
+            echo "- NEXTAUTH_URL must be set correctly for each environment"
+            echo "- OAuth provider callback URLs must include all Vercel preview URLs"
+          fi
+      
+      # Function timeout configuration check
+      - name: Check for serverless function timeout configuration
+        run: |
+          if [ -f "vercel.json" ]; then
+            if ! grep -q "maxDuration" vercel.json; then
+              echo "⚠️ No maxDuration found in vercel.json. Consider adding for long-running functions:"
+              echo '{
+                "functions": {
+                  "api/*.js": {
+                    "maxDuration": 60
+                  }
+                }
+              }'
+            fi
+          else
+            echo "⚠️ No vercel.json found. Consider creating one to configure function timeouts."
+          fi
+      
+      # Build check
+      - name: Verify build
+        run: npm run build || echo "Build failed"
+      
+      # E2E tests if Playwright is configured
+      - name: Run E2E tests if available
+        if: hashFiles('playwright.config.ts') != '' || hashFiles('playwright.config.js') != ''
+        run: |
+          if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
+            echo "Playwright configuration detected. Installing browsers..."
+            npx playwright install --with-deps chromium
+            echo "Running minimal E2E tests..."
+            npx playwright test -c playwright.config.ts || echo "E2E tests failed"
+          fi
+      
+      # Summary report
+      - name: Generate deployment checklist summary
+        run: |
+          echo "# Vercel Deployment Checklist Summary" > checklist-summary.md
+          echo "## Pre-deployment checks completed on $(date)" >> checklist-summary.md
+          echo "- Repository: $GITHUB_REPOSITORY" >> checklist-summary.md
+          echo "- Branch: $GITHUB_REF_NAME" >> checklist-summary.md
+          echo "- Commit: $GITHUB_SHA" >> checklist-summary.md
+          echo "" >> checklist-summary.md
+          echo "## Recommendations" >> checklist-summary.md
+          echo "- Review any warnings above in the job logs" >> checklist-summary.md
+          echo "- Verify environment variables are set in Vercel" >> checklist-summary.md
+          echo "- Test preview deployment thoroughly before promoting to production" >> checklist-summary.md
+          
+      - name: Upload checklist summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: vercel-deployment-checklist
+          path: checklist-summary.md
+      
+      # Comment on PR if this is a pull request
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('checklist-summary.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });

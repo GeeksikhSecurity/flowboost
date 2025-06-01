@@ -1,6 +1,6 @@
 # Common Vercel Deployment Issues & Solutions
 
-Based on analysis of real-world deployment problems, this guide addresses the most frequent issues developers face with Vercel deployments.
+Based on analysis of real-world deployment problems from Reddit, this guide addresses the most frequent issues developers face with Vercel deployments.
 
 ## 1. File Not Found (ENOENT) Errors
 
@@ -72,7 +72,7 @@ callbacks: {
 ### Symptoms
 - Connection pool errors with Prisma
 - "Too many connections" errors
-- Timeouts connecting to Supabase
+- Timeouts connecting to Supabase or Neon
 
 ### Solutions
 - Implement connection pooling for serverless environments
@@ -91,7 +91,10 @@ export const prisma =
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 ```
 - Use environment-specific connection strings
-- For Supabase, use direct connection in serverless functions
+- For Neon/Postgres, ensure proper connection string format:
+```
+postgresql://user:password@host/database?sslmode=require&pgbouncer=true
+```
 
 ## 5. Static Export Problems
 
@@ -126,13 +129,6 @@ export default defineConfig({
 ```ts
 // Wait for specific element instead of fixed delay
 await page.waitForSelector('.dynamic-content', { state: 'visible' });
-```
-- Use video recording to debug CI failures
-```ts
-// In playwright.config.ts
-use: {
-  video: process.env.CI ? 'on-first-retry' : 'off',
-}
 ```
 - Test against deployed preview URL
 ```yaml
